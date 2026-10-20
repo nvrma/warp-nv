@@ -2309,6 +2309,7 @@ pub(crate) fn initialize_app(
     // ActiveAgentViewsModel is used to track active agent conversations and notify listeners when they change.
     ctx.add_singleton_model(|_| ActiveAgentViewsModel::new());
     ctx.add_singleton_model(AgentNotificationsModel::new);
+    ctx.add_singleton_model(ai::agent_management::dock_badge::AgentDockBadgeModel::new);
     ctx.add_singleton_model(BlocklistAIPermissions::new);
     ctx.add_singleton_model(ai::blocklist::orchestration_events::OrchestrationEventService::new);
     ctx.add_singleton_model(

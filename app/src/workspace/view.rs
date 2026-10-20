@@ -120,6 +120,7 @@ use warpui::{
     UpdateModel, UpdateView, View, ViewAsRef, ViewContext, ViewHandle, WeakViewHandle, WindowId,
 };
 
+use self::vertical_tabs::agent_deck::{collect_agent_deck_entries, next_agent_needing_attention};
 use self::vertical_tabs::telemetry::{VerticalTabsDisplayOption, VerticalTabsTelemetryEvent};
 use self::vertical_tabs::{
     SummaryPaneKind, SummaryPaneKindIcons, VERTICAL_TABS_SETTINGS_BUTTON_POSITION_ID,
@@ -25813,6 +25814,19 @@ impl TypedActionView for Workspace {
                         });
                     }
                 }
+            }
+            FocusNextAgentNeedingAttention => {
+                if FeatureFlag::AgentDeck.is_enabled()
+                    && let Some(locator) =
+                        next_agent_needing_attention(&collect_agent_deck_entries(self, ctx))
+                {
+                    self.focus_pane(locator, ctx);
+                }
+            }
+            ToggleAgentDeck => {
+                self.vertical_tabs_panel.agent_deck.collapsed =
+                    !self.vertical_tabs_panel.agent_deck.collapsed;
+                ctx.notify();
             }
             ScrollToSettingsWidget { page, widget_id } => {
                 self.open_settings_pane(Some(*page), None, ctx);

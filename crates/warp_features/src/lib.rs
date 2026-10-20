@@ -848,6 +848,11 @@ pub enum FeatureFlag {
     /// instead of individual pane rows.
     VerticalTabsSummaryMode,
 
+    /// Enables the agent deck: an urgency-sorted roster of the window's agents pinned to the top
+    /// of the vertical tabs panel, animated agent status beacons, motion on agent notification
+    /// toasts, the "jump to next agent needing attention" action, and the macOS Dock badge.
+    AgentDeck,
+
     CloudModeInputV2,
 
     /// Enables continuing cloud mode conversations in the cloud after an execution ends.

@@ -2,6 +2,7 @@
 //! src/integration.rs and src/bin/integration.rs in order to register them
 //! to be run.
 
+mod agent_deck;
 mod agent_mode;
 mod ai_assistant;
 mod ai_document;
@@ -50,6 +51,7 @@ use std::path::PathBuf;
 use std::rc::Rc;
 use std::time::Duration;
 
+pub use agent_deck::*;
 pub use agent_mode::*;
 pub use ai_assistant::*;
 pub use ai_document::*;

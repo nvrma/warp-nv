@@ -7,7 +7,7 @@ use cocoa::base::{BOOL, NO, YES, id, nil};
 use objc2::{MainThreadMarker, msg_send};
 use objc2_app_kit::{NSApplication, NSCursor, NSRequestUserAttentionType};
 use objc2_av_foundation::{AVAuthorizationStatus, AVCaptureDevice, AVMediaTypeAudio};
-use objc2_foundation::NSUInteger;
+use objc2_foundation::{NSString, NSUInteger};
 use warpui_core::accessibility::AccessibilityContent;
 use warpui_core::clipboard::InMemoryClipboard;
 use warpui_core::keymap::Keystroke;
@@ -308,6 +308,15 @@ impl platform::Delegate for AppDelegate {
         let mtm = unsafe { MainThreadMarker::new_unchecked() };
         let _ = NSApplication::sharedApplication(mtm)
             .requestUserAttention(NSRequestUserAttentionType::InformationalRequest);
+    }
+
+    fn set_dock_badge_label(&self, label: Option<&str>) {
+        // SAFETY: delegate methods run on the main thread.
+        let mtm = unsafe { MainThreadMarker::new_unchecked() };
+        let label = label.map(NSString::from_str);
+        NSApplication::sharedApplication(mtm)
+            .dockTile()
+            .setBadgeLabel(label.as_deref());
     }
 
     fn request_desktop_notification_permissions(

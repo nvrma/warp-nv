@@ -2295,6 +2295,11 @@ impl AppContext {
         self.platform_delegate.request_user_attention(window_id);
     }
 
+    /// Shows `label` as a badge on the app's Dock icon, or clears the badge when `None`.
+    pub fn set_dock_badge_label(&self, label: Option<&str>) {
+        self.platform_delegate.set_dock_badge_label(label);
+    }
+
     /// Delegates to the OS to show the system character palette.
     pub fn open_character_palette(&mut self) {
         self.platform_delegate.open_character_palette();

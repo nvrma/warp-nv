@@ -1,12 +1,16 @@
 use std::time::Duration;
 
+use instant::Instant;
+use pathfinder_color::ColorU;
 use pathfinder_geometry::vector::vec2f;
+use warp_core::features::FeatureFlag;
 use warp_core::ui::color::blend::Blend;
+use warp_core::ui::theme::WarpTheme;
 use warp_core::ui::theme::color::internal_colors;
 use warpui::r#async::{SpawnedFutureHandle, Timer};
 use warpui::elements::{
     Border, ChildAnchor, ConstrainedBox, Container, CornerRadius, CrossAxisAlignment,
-    DispatchEventResult, Element, EventHandler, Flex, Hoverable, MouseStateHandle,
+    DispatchEventResult, DropShadow, Element, EventHandler, Flex, Hoverable, MouseStateHandle,
     OffsetPositioning, Padding, ParentElement, PositionedElementAnchor,
     PositionedElementOffsetBounds, Radius, SavePosition, Shrinkable, Stack,
 };
@@ -20,16 +24,23 @@ use crate::ai::agent_management::notifications::item_rendering::{
     NotificationRenderContext, OnExpandClick, create_notification_artifact_buttons_view,
     handle_notification_artifact_buttons_event, render_notification_item_content,
 };
-use crate::ai::agent_management::notifications::{NotificationId, NotificationItem};
+use crate::ai::agent_management::notifications::{
+    NotificationCategory, NotificationId, NotificationItem,
+};
 use crate::ai::agent_management::{AgentManagementEvent, AgentNotificationsModel};
 use crate::ai::artifacts::{Artifact, ArtifactButtonsRow, ArtifactButtonsRowEvent};
 use crate::appearance::Appearance;
 use crate::terminal::session_settings::SessionSettings;
+use crate::ui_components::agent_beacon::{AgentActivity, with_alpha};
+use crate::ui_components::motion::{CountdownBar, SlideIn};
 use crate::util::bindings::keybinding_name_to_keystroke;
 use crate::workspace::WorkspaceAction;
 use crate::workspace::view::JUMP_TO_LATEST_TOAST_BINDING_NAME;
 
 const CLOSE_BUTTON_SIZE: f32 = 20.;
+const TOAST_SLIDE_IN_DURATION: Duration = Duration::from_millis(360);
+const TOAST_SLIDE_IN_DISTANCE: f32 = 56.;
+const COUNTDOWN_BAR_HEIGHT: f32 = 2.;
 
 /// Tracks the state of a single visible toast in the stack
 /// (its auto-dismiss timer, hover state, and close button).
@@ -41,6 +52,10 @@ struct NotificationToastItem {
     close_button_hover_state: MouseStateHandle,
     artifact_buttons_view: Option<ViewHandle<ArtifactButtonsRow>>,
     message_expanded: bool,
+    shown_at: Instant,
+    /// When the current auto-dismiss countdown began; `None` while it is paused by hover.
+    countdown_started_at: Option<Instant>,
+    countdown_duration: Duration,
 }
 
 pub struct AgentNotificationToastStack {
@@ -143,6 +158,9 @@ impl AgentNotificationToastStack {
             close_button_hover_state: MouseStateHandle::default(),
             artifact_buttons_view,
             message_expanded: false,
+            shown_at: Instant::now(),
+            countdown_started_at: None,
+            countdown_duration: Duration::ZERO,
         });
         self.start_dismissal_timeout(id, ctx);
 
@@ -190,11 +208,13 @@ impl AgentNotificationToastStack {
     }
 
     /// Pauses the auto-dismiss timer for a toast (e.g. while the user is hovering over it).
-    fn cancel_dismissal_timeout(&mut self, id: &NotificationId) {
-        if let Some(entry) = self.toasts.iter_mut().find(|e| e.notification_id == *id)
-            && let Some(handle) = entry.abort_handle.take()
-        {
-            handle.abort();
+    fn cancel_dismissal_timeout(&mut self, id: &NotificationId, ctx: &mut ViewContext<Self>) {
+        if let Some(entry) = self.toasts.iter_mut().find(|e| e.notification_id == *id) {
+            if let Some(handle) = entry.abort_handle.take() {
+                handle.abort();
+            }
+            entry.countdown_started_at = None;
+            ctx.notify();
         }
     }
 
@@ -222,12 +242,16 @@ impl AgentNotificationToastStack {
                 handle.abort();
             }
             let duration_secs = *SessionSettings::as_ref(ctx).notification_toast_duration_secs;
+            let duration = Duration::from_secs(duration_secs);
             let abort_handle = ctx.spawn_abortable(
-                Timer::after(Duration::from_secs(duration_secs)),
+                Timer::after(duration),
                 move |me, _, ctx| me.dismiss_toast_by_id(&id, ctx),
                 |_, _| {},
             );
             entry.abort_handle = Some(abort_handle);
+            entry.countdown_started_at = Some(Instant::now());
+            entry.countdown_duration = duration;
+            ctx.notify();
         }
     }
 }
@@ -238,7 +262,7 @@ impl TypedActionView for AgentNotificationToastStack {
     fn handle_action(&mut self, action: &Self::Action, ctx: &mut ViewContext<Self>) {
         match action {
             AgentNotificationToastAction::CancelDismissalTimeout(id) => {
-                self.cancel_dismissal_timeout(id);
+                self.cancel_dismissal_timeout(id, ctx);
             }
             AgentNotificationToastAction::StartDismissalTimeout(id) => {
                 self.start_dismissal_timeout(*id, ctx);
@@ -300,6 +324,11 @@ impl View for AgentNotificationToastStack {
                 entry.artifact_buttons_view.as_ref(),
                 entry.message_expanded,
                 is_newest.then(|| keystroke.clone()).flatten(),
+                ToastMotion {
+                    shown_at: entry.shown_at,
+                    countdown_started_at: entry.countdown_started_at,
+                    countdown_duration: entry.countdown_duration,
+                },
                 appearance,
             );
             column.add_child(Container::new(toast).with_margin_bottom(4.).finish());
@@ -364,9 +393,12 @@ fn render_toast(
     artifact_buttons: Option<&ViewHandle<ArtifactButtonsRow>>,
     message_expanded: bool,
     keystroke: Option<Keystroke>,
+    motion: ToastMotion,
     appearance: &Appearance,
 ) -> Box<dyn Element> {
     let theme = appearance.theme();
+    let is_animated = FeatureFlag::AgentDeck.is_enabled();
+    let accent = category_accent(item.category, theme);
     let on_expand: OnExpandClick = Box::new(move |ctx: &mut warpui::EventContext| {
         ctx.dispatch_typed_action(AgentNotificationToastAction::ToggleMessageExpanded(id));
     });
@@ -382,13 +414,29 @@ fn render_toast(
         appearance,
     );
 
-    let inner_column = Flex::column()
+    let mut inner_column = Flex::column()
         .with_cross_axis_alignment(CrossAxisAlignment::Stretch)
         .with_child(content);
+    if is_animated {
+        inner_column.add_child(
+            Container::new(
+                CountdownBar::new(
+                    motion.countdown_started_at,
+                    motion.countdown_duration,
+                    with_alpha(accent, 0.8),
+                    internal_colors::fg_overlay_2(theme).into_solid(),
+                    COUNTDOWN_BAR_HEIGHT,
+                )
+                .finish(),
+            )
+            .with_margin_top(10.)
+            .finish(),
+        );
+    }
 
     let position_id = toast_position_id(id);
 
-    EventHandler::new(
+    let toast = EventHandler::new(
         Hoverable::new(mouse_state, move |state| {
             let bg = if state.is_hovered() {
                 theme
@@ -400,11 +448,24 @@ fn render_toast(
                     .blend(&internal_colors::fg_overlay_2(theme))
             };
 
-            let container = Container::new(inner_column.finish())
+            let border_color = if is_animated {
+                with_alpha(accent, if state.is_hovered() { 0.75 } else { 0.5 })
+            } else {
+                theme.outline().into()
+            };
+            let mut container = Container::new(inner_column.finish())
                 .with_padding(Padding::uniform(12.))
                 .with_background(bg)
-                .with_border(Border::all(1.).with_border_color(theme.outline().into()))
+                .with_border(Border::all(1.).with_border_color(border_color))
                 .with_corner_radius(CornerRadius::with_all(Radius::Pixels(8.)));
+            if is_animated {
+                container = container.with_drop_shadow(DropShadow {
+                    color: with_alpha(accent, 0.22),
+                    offset: vec2f(0., 6.),
+                    blur_radius: 18.,
+                    spread_radius: 0.,
+                });
+            }
 
             let sized = ConstrainedBox::new(container.finish())
                 .with_width(420.)
@@ -451,7 +512,35 @@ fn render_toast(
         ctx.dispatch_typed_action(AgentNotificationToastAction::Click(id));
         DispatchEventResult::StopPropagation
     })
-    .finish()
+    .finish();
+
+    if is_animated {
+        SlideIn::new(
+            toast,
+            motion.shown_at,
+            TOAST_SLIDE_IN_DURATION,
+            TOAST_SLIDE_IN_DISTANCE,
+        )
+        .finish()
+    } else {
+        toast
+    }
+}
+
+/// Timing inputs for a toast's entrance and auto-dismiss countdown.
+struct ToastMotion {
+    shown_at: Instant,
+    countdown_started_at: Option<Instant>,
+    countdown_duration: Duration,
+}
+
+fn category_accent(category: NotificationCategory, theme: &WarpTheme) -> ColorU {
+    let activity = match category {
+        NotificationCategory::Request => AgentActivity::NeedsInput,
+        NotificationCategory::Error => AgentActivity::Errored,
+        NotificationCategory::Complete => AgentActivity::Done,
+    };
+    activity.color(theme)
 }
 
 fn render_keybinding_hint(keystroke: Keystroke, appearance: &Appearance) -> Box<dyn Element> {

@@ -555,6 +555,10 @@ pub enum WorkspaceAction {
     },
     /// Jump to the terminal pane of the most recent agent toast
     JumpToLatestToast,
+    /// Focus the next agent in this window that is waiting on the user, cycling in urgency order.
+    FocusNextAgentNeedingAttention,
+    /// Collapse or expand the agent deck at the top of the vertical tabs panel.
+    ToggleAgentDeck,
     /// Open a file in a new tab with a code pane
     OpenFileInNewTab {
         full_path: PathBuf,
@@ -1169,6 +1173,8 @@ impl WorkspaceAction {
             | StartNewConversation { .. }
             | UndoRevertInCodeReviewPane { .. }
             | JumpToLatestToast
+            | FocusNextAgentNeedingAttention
+            | ToggleAgentDeck
             | NavigatePrevPaneOrPanel
             | NavigateNextPaneOrPanel
             | ToggleProjectExplorer

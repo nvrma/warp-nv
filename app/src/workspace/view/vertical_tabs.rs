@@ -1,3 +1,4 @@
+pub(super) mod agent_deck;
 pub mod telemetry;
 
 use std::cell::RefCell;
@@ -79,6 +80,7 @@ use crate::workspace::tab_settings::{
     TabSettings, VerticalTabsCompactSubtitle, VerticalTabsDisplayGranularity,
     VerticalTabsPrimaryInfo, VerticalTabsTabItemMode, VerticalTabsViewMode,
 };
+use crate::workspace::view::vertical_tabs::agent_deck::{AgentDeckState, render_agent_deck};
 use crate::workspace::view::vertical_tabs::telemetry::{
     VerticalTabsChipEntrypoint, VerticalTabsTelemetryEvent,
 };
@@ -730,6 +732,7 @@ pub(super) struct VerticalTabsPanelState {
     show_details_on_hover_mouse_state: MouseStateHandle,
     panel_right_click_mouse_state: MouseStateHandle,
     pub(super) show_settings_popup: bool,
+    pub(super) agent_deck: AgentDeckState,
 }
 
 impl Default for VerticalTabsPanelState {
@@ -768,6 +771,7 @@ impl Default for VerticalTabsPanelState {
             show_details_on_hover_mouse_state: Default::default(),
             panel_right_click_mouse_state: Default::default(),
             show_settings_popup: false,
+            agent_deck: AgentDeckState::default(),
         }
     }
 }
@@ -1688,7 +1692,7 @@ fn render_vertical_tabs_panel(
     .with_overlayed_scrollbar()
     .finish();
 
-    let panel_content = Flex::column()
+    let mut panel_content = Flex::column()
         .with_main_axis_size(MainAxisSize::Max)
         .with_cross_axis_alignment(CrossAxisAlignment::Stretch)
         .with_child(render_control_bar(
@@ -1696,7 +1700,13 @@ fn render_vertical_tabs_panel(
             workspace,
             &workspace.vertical_tabs_search_input,
             app,
-        ))
+        ));
+    if FeatureFlag::AgentDeck.is_enabled()
+        && let Some(agent_deck) = render_agent_deck(&state.agent_deck, workspace, app)
+    {
+        panel_content.add_child(agent_deck);
+    }
+    let panel_content = panel_content
         .with_child(Shrinkable::new(1., scrollable_groups).finish())
         .finish();
 

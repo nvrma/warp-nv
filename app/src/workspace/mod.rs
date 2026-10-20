@@ -1511,6 +1511,26 @@ pub fn init(app: &mut AppContext) {
     .with_group(bindings::BindingGroup::WarpAi.as_str())]);
 
     app.register_editable_bindings([EditableBinding::new(
+        "workspace:focus_next_agent_needing_attention",
+        "Jump to next agent needing attention",
+        WorkspaceAction::FocusNextAgentNeedingAttention,
+    )
+    .with_enabled(|| FeatureFlag::AgentDeck.is_enabled())
+    .with_context_predicate(id!("Workspace"))
+    .with_mac_key_binding("cmd-shift-L")
+    .with_linux_or_windows_key_binding("ctrl-shift-L")
+    .with_group(bindings::BindingGroup::WarpAi.as_str())]);
+
+    app.register_editable_bindings([EditableBinding::new(
+        "workspace:toggle_agent_deck",
+        "Toggle agents section in vertical tabs",
+        WorkspaceAction::ToggleAgentDeck,
+    )
+    .with_enabled(|| FeatureFlag::AgentDeck.is_enabled() && FeatureFlag::VerticalTabs.is_enabled())
+    .with_context_predicate(id!("Workspace"))
+    .with_group(bindings::BindingGroup::WarpAi.as_str())]);
+
+    app.register_editable_bindings([EditableBinding::new(
         TOGGLE_NOTIFICATION_MAILBOX_BINDING_NAME,
         "Toggle notification mailbox",
         WorkspaceAction::ToggleNotificationMailbox { select_first: true },

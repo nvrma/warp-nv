@@ -208,6 +208,10 @@ pub trait Delegate: 'static {
 
     fn request_user_attention(&self, window_id: WindowId);
 
+    /// Shows `label` as a badge on the app's Dock icon, or clears the badge when `None`. A no-op
+    /// on platforms without a Dock.
+    fn set_dock_badge_label(&self, _label: Option<&str>) {}
+
     fn clipboard(&mut self) -> &mut dyn Clipboard;
 
     fn system_theme(&self) -> SystemTheme;
