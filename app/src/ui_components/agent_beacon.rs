@@ -1,6 +1,6 @@
 //! A small animated status glyph for agent rows. Agents that need the user "sonar" outward,
-//! working agents breathe with a comet orbiting the core, and settled states hold still so motion
-//! is reserved for what is live.
+//! working agents spin a tapering arc around a breathing core, and settled states hold still so
+//! motion is reserved for what is live.
 
 use std::f32::consts::TAU;
 use std::sync::OnceLock;
@@ -24,13 +24,19 @@ use crate::ai::agent::conversation::ConversationStatus;
 const FRAME_INTERVAL: Duration = Duration::from_millis(33);
 const SONAR_PERIOD: Duration = Duration::from_millis(1500);
 const BREATH_PERIOD: Duration = Duration::from_millis(1600);
-const ORBIT_PERIOD: Duration = Duration::from_millis(1100);
+/// One revolution of the working spinner's leading edge.
+const SPINNER_PERIOD: Duration = Duration::from_millis(1100);
+/// One grow-and-shrink cycle of the spinner's arc, offset from the rotation so the tail appears
+/// to chase the head.
+const SPINNER_SWEEP_PERIOD: Duration = Duration::from_millis(2300);
+const SPINNER_MIN_SWEEP: f32 = 0.25 * std::f32::consts::PI;
+const SPINNER_MAX_SWEEP: f32 = 1.4 * std::f32::consts::PI;
+/// Dots laid along the arc; dense enough that they overlap into a continuous stroke.
+const SPINNER_DOTS: usize = 18;
+const SPINNER_STROKE_RADIUS: f32 = 0.95;
 /// How long an agent waiting on the user keeps pinging before its beacon settles, so an agent left
 /// blocked for hours doesn't keep the window repainting.
 const SONAR_ACTIVE_WINDOW: Duration = Duration::from_secs(120);
-/// Radians between consecutive dots of the working comet's tail.
-const COMET_TAIL_SPACING: f32 = 0.45;
-const COMET_TAIL_ALPHAS: [f32; 3] = [1.0, 0.55, 0.25];
 
 /// Coarse activity state of an agent, ordered from most to least urgent so a sort puts the agents
 /// that need the user first.
@@ -168,25 +174,42 @@ impl Element for AgentBeacon {
             }
             AgentActivity::Working => {
                 let breath = breath(cycle_phase(elapsed, BREATH_PERIOD, 0.));
+                let core_radius = core_radius * 0.85;
                 draw_disc(
                     ctx,
                     center,
                     core_radius + 0.5 + breath,
-                    with_alpha(self.color, 0.3 * breath),
+                    with_alpha(self.color, 0.25 * breath),
                 );
                 draw_disc(
                     ctx,
                     center,
                     core_radius,
-                    with_alpha(self.color, 0.7 + 0.3 * breath),
+                    with_alpha(self.color, 0.75 + 0.25 * breath),
                 );
-                let orbit_radius = outer_radius - 1.;
-                let head_angle = TAU * cycle_phase(elapsed, ORBIT_PERIOD, 0.);
-                for (index, alpha) in COMET_TAIL_ALPHAS.into_iter().enumerate() {
-                    let angle = head_angle - COMET_TAIL_SPACING * index as f32;
-                    let position = center + vec2f(angle.cos(), angle.sin()) * orbit_radius;
-                    let dot_radius = 1.1 - 0.2 * index as f32;
-                    draw_disc(ctx, position, dot_radius, with_alpha(self.color, alpha));
+
+                let arc_radius = outer_radius - 1.2;
+                // Borders are drawn inside their bounds, so grow the track by half its width to
+                // center it under the arc.
+                draw_ring(
+                    ctx,
+                    center,
+                    arc_radius + 0.5,
+                    1.,
+                    with_alpha(self.color, 0.12),
+                );
+                let arc = spinner_arc(elapsed);
+                for index in 0..SPINNER_DOTS {
+                    let distance_from_head = index as f32 / (SPINNER_DOTS - 1) as f32;
+                    let angle = arc.head - arc.sweep * distance_from_head;
+                    let position = center + vec2f(angle.cos(), angle.sin()) * arc_radius;
+                    let alpha = (1. - distance_from_head).powf(1.4);
+                    draw_disc(
+                        ctx,
+                        position,
+                        SPINNER_STROKE_RADIUS,
+                        with_alpha(self.color, alpha),
+                    );
                 }
             }
             AgentActivity::NeedsInput | AgentActivity::Errored | AgentActivity::Done => {
@@ -256,6 +279,22 @@ fn sonar_ring(phase: f32) -> SonarRing {
         spread: ease_out_cubic(phase),
         alpha: (1. - phase).powf(1.6) * 0.85,
         width: 1.5 - 0.75 * phase,
+    }
+}
+
+#[derive(Debug)]
+struct SpinnerArc {
+    /// Angle of the arc's leading edge, in radians.
+    head: f32,
+    /// Angular length of the arc trailing behind the head, in radians.
+    sweep: f32,
+}
+
+fn spinner_arc(elapsed: Duration) -> SpinnerArc {
+    let swell = breath(cycle_phase(elapsed, SPINNER_SWEEP_PERIOD, 0.));
+    SpinnerArc {
+        head: TAU * cycle_phase(elapsed, SPINNER_PERIOD, 0.),
+        sweep: SPINNER_MIN_SWEEP + (SPINNER_MAX_SWEEP - SPINNER_MIN_SWEEP) * swell,
     }
 }
 

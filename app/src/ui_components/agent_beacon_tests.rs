@@ -176,3 +176,14 @@ fn waiting_beacon_settles_after_its_active_window() {
     assert!(!beacon(AgentActivity::Errored).is_animating());
     assert!(!beacon(AgentActivity::Idle).is_animating());
 }
+
+#[test]
+fn spinner_arc_stays_within_its_sweep_bounds() {
+    for step in 0..200 {
+        let arc = spinner_arc(Duration::from_millis(step * 37));
+        assert!((0. ..std::f32::consts::TAU).contains(&arc.head));
+        assert!(arc.sweep >= SPINNER_MIN_SWEEP - 1e-5);
+        assert!(arc.sweep <= SPINNER_MAX_SWEEP + 1e-5);
+    }
+    assert!((spinner_arc(Duration::ZERO).sweep - SPINNER_MIN_SWEEP).abs() < 1e-5);
+}

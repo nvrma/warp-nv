@@ -6,7 +6,7 @@ use std::time::Duration;
 
 use instant::Instant;
 use pathfinder_color::ColorU;
-use warpui::elements::{CornerRadius, Point, Radius, SelectableElement};
+use warpui::elements::{CornerRadius, Fill, Point, Radius, SelectableElement};
 use warpui::event::DispatchedEvent;
 use warpui::geometry::rect::RectF;
 use warpui::geometry::vector::{Vector2F, vec2f};
@@ -15,7 +15,7 @@ use warpui::{
     SizeConstraint,
 };
 
-use crate::ui_components::agent_beacon::ease_out_back;
+use crate::ui_components::agent_beacon::{ease_out_back, with_alpha};
 
 /// ~60fps for short entrance motion, where smoothness matters more than for ambient animation.
 const ENTRANCE_FRAME_INTERVAL: Duration = Duration::from_millis(16);
@@ -161,9 +161,15 @@ impl Element for CountdownBar {
         });
         let fill_width = size.x() * remaining;
         if fill_width > 0. {
+            // Fades in from the left so the bar reads as draining toward its bright leading edge.
             ctx.scene
                 .draw_rect_without_hit_recording(RectF::new(origin, vec2f(fill_width, size.y())))
-                .with_background(self.color)
+                .with_background(Fill::Gradient {
+                    start: vec2f(0., 0.),
+                    end: vec2f(1., 0.),
+                    start_color: with_alpha(self.color, 0.35),
+                    end_color: self.color,
+                })
                 .with_corner_radius(rounded);
         }
         if self.started_at.is_some() && remaining > 0. {

@@ -423,7 +423,7 @@ fn render_toast(
                 CountdownBar::new(
                     motion.countdown_started_at,
                     motion.countdown_duration,
-                    with_alpha(accent, 0.8),
+                    accent,
                     internal_colors::fg_overlay_2(theme).into_solid(),
                     COUNTDOWN_BAR_HEIGHT,
                 )

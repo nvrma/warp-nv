@@ -11,6 +11,8 @@ use warp::integration_testing::terminal::{
     execute_long_running_command, wait_until_bootstrapped_single_pane_for_tab,
 };
 use warp::integration_testing::workspace::assert_focused_tab_index;
+use warp::settings::ThemeSettings;
+use warp::themes::theme::ThemeKind;
 use warp::workspace::tab_settings::TabSettings;
 use warpui_core::integration::TestStep;
 use warpui_core::{SingletonEntity, async_assert};
@@ -108,6 +110,22 @@ pub fn test_agent_deck_screenshot() -> Builder {
                     })
                 },
             ),
+        )
+        .with_step(
+            new_step_with_default_assertions("Switch to the Tokyo Night theme")
+                .add_named_assertion("Tokyo Night is the active theme", |app, _| {
+                    ThemeSettings::handle(app).update(app, |settings, ctx| {
+                        settings
+                            .use_system_theme
+                            .set_value(false, ctx)
+                            .expect("system theme setting should update");
+                        settings
+                            .theme_kind
+                            .set_value(ThemeKind::TokyoNight, ctx)
+                            .expect("theme setting should update");
+                        async_assert!(*settings.theme_kind.value() == ThemeKind::TokyoNight)
+                    })
+                }),
         )
         .with_step(simulate_agent(
             0,

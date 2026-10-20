@@ -176,6 +176,28 @@ const GRUVBOX_LIGHT_BRIGHT_COLORS: AnsiColors = AnsiColors::new(
     AnsiColor::from_u32(0x3C3836FF),
 );
 
+/// The "night" style of folke/tokyonight.nvim's terminal palette.
+const TOKYO_NIGHT_NORMAL_COLORS: AnsiColors = AnsiColors::new(
+    AnsiColor::from_u32(0x15161EFF),
+    AnsiColor::from_u32(0xF7768EFF),
+    AnsiColor::from_u32(0x9ECE6AFF),
+    AnsiColor::from_u32(0xE0AF68FF),
+    AnsiColor::from_u32(0x7AA2F7FF),
+    AnsiColor::from_u32(0xBB9AF7FF),
+    AnsiColor::from_u32(0x7DCFFFFF),
+    AnsiColor::from_u32(0xA9B1D6FF),
+);
+const TOKYO_NIGHT_BRIGHT_COLORS: AnsiColors = AnsiColors::new(
+    AnsiColor::from_u32(0x414868FF),
+    AnsiColor::from_u32(0xFF899DFF),
+    AnsiColor::from_u32(0x9FE044FF),
+    AnsiColor::from_u32(0xFABA4AFF),
+    AnsiColor::from_u32(0x8DB0FFFF),
+    AnsiColor::from_u32(0xC7A9FFFF),
+    AnsiColor::from_u32(0xA4DAFFFF),
+    AnsiColor::from_u32(0xC0CAF5FF),
+);
+
 const SOLARFLARE_NORMAL_COLORS: AnsiColors = AnsiColors::new(
     AnsiColor::from_u32(0x2E333DFF),
     AnsiColor::from_u32(0xD66060FF),
@@ -256,6 +278,10 @@ pub(super) fn solarflare_colors() -> TerminalColors {
 
 pub(super) fn adeberry_colors() -> TerminalColors {
     TerminalColors::new(ADEBERRY_NORMAL_COLORS, ADEBERRY_BRIGHT_COLORS)
+}
+
+pub(super) fn tokyo_night_colors() -> TerminalColors {
+    TerminalColors::new(TOKYO_NIGHT_NORMAL_COLORS, TOKYO_NIGHT_BRIGHT_COLORS)
 }
 
 /// Default bundled themes
@@ -611,6 +637,19 @@ pub(super) fn adeberry() -> WarpTheme {
         adeberry_colors(),
         None,
         Some("Adeberry".to_string()),
+    )
+}
+
+pub(super) fn tokyo_night() -> WarpTheme {
+    WarpTheme::new(
+        Fill::Solid(ColorU::from_u32(0x1A1B26FF)),
+        ColorU::from_u32(0xC0CAF5FF),
+        Fill::Solid(ColorU::from_u32(0x7AA2F7FF)),
+        None,
+        Some(Details::Darker),
+        tokyo_night_colors(),
+        None,
+        Some("Tokyo Night".to_string()),
     )
 }
 
